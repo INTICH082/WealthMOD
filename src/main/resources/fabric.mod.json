@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "minecraftwealth",
+  "version": "${version}",
+  "name": "Minecraft Wealth",
+  "description": "Подсчитывает состояние игрока на основе стоимости игровых ресурсов: инвентарь, эндер-сундук, шалкеры. Настраиваемые цены через JSON, таблица лидеров, API для других модов.",
+  "authors": ["INTICH082"],
+  "contact": {
+    "sources": "https://github.com/INTICH082/minecraft-wealth"
+  },
+  "license": "MIT",
+  "icon": "assets/minecraftwealth/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.mcwealth.mod.MinecraftWealthMod"
+    ],
+    "client": [
+      "com.mcwealth.mod.MinecraftWealthModClient"
+    ],
+    "modmenu": [
+      "com.mcwealth.mod.config.WealthModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "minecraftwealth.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "cloth-config": "*",
+    "modmenu": "*"
+  }
+}

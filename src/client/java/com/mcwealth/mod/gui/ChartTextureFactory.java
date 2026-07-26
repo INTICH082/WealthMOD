@@ -1,0 +1,144 @@
+package com.mcwealth.mod.gui;
+
+import com.mcwealth.mod.network.ChartData;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.util.Identifier;
+import org.knowm.xchart.BitmapEncoder;
+import org.knowm.xchart.CategoryChart;
+import org.knowm.xchart.CategoryChartBuilder;
+import org.knowm.xchart.PieChart;
+import org.knowm.xchart.PieChartBuilder;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
+import org.knowm.xchart.XYSeries;
+import org.knowm.xchart.style.markers.SeriesMarkers;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+
+public final class ChartTextureFactory {
+
+    static {
+        System.setProperty("java.awt.headless", "true");
+    }
+
+    private static final Color BG = new Color(24, 24, 24);
+    private static final Color PLOT_BG = new Color(18, 18, 18);
+    private static final Color GRID = new Color(55, 55, 55);
+    private static final Color FONT = new Color(230, 230, 230);
+    private static final Color ACCENT = new Color(85, 200, 120);
+
+    private static final AtomicInteger COUNTER = new AtomicInteger();
+
+    private ChartTextureFactory() {
+    }
+
+    public record RenderedChart(Identifier textureId, NativeImageBackedTexture texture, int width, int height) {
+        public void close() {
+            texture.close();
+        }
+    }
+
+    public static RenderedChart historyChart(List<ChartData.HistoryEntry> history, int width, int height) {
+        if (history.size() < 2) {
+            return null;
+        }
+        XYChart chart = new XYChartBuilder().width(width).height(height).build();
+        styleBase(chart.getStyler());
+
+        double[] xData = new double[history.size()];
+        double[] yData = new double[history.size()];
+        for (int i = 0; i < history.size(); i++) {
+            xData[i] = i;
+            yData[i] = history.get(i).total();
+        }
+        XYSeries series = chart.addSeries("$", xData, yData);
+        series.setMarker(SeriesMarkers.CIRCLE);
+        series.setMarkerColor(ACCENT);
+        series.setLineColor(ACCENT);
+        series.setLineWidth(2f);
+        series.setXYSeriesRenderStyle(org.knowm.xchart.XYSeries.XYSeriesRenderStyle.Area);
+        series.setFillColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
+        chart.getStyler().setLegendVisible(false);
+
+        return upload(BitmapEncoder.getBufferedImage(chart), "history");
+    }
+
+    public static RenderedChart compositionChart(Map<String, Double> byCategory, Function<String, String> labelFn,
+                                                   int width, int height) {
+        PieChart chart = new PieChartBuilder().width(width).height(height).build();
+        chart.getStyler().setChartBackgroundColor(BG);
+        chart.getStyler().setPlotBackgroundColor(BG);
+        chart.getStyler().setChartFontColor(FONT);
+        chart.getStyler().setLegendBackgroundColor(BG);
+        chart.getStyler().setLegendVisible(true);
+        chart.getStyler().setPlotBorderVisible(false);
+        chart.getStyler().setAnnotationType(org.knowm.xchart.style.PieStyler.AnnotationType.LabelAndPercentage);
+
+        boolean any = false;
+        for (Map.Entry<String, Double> entry : byCategory.entrySet()) {
+            if (entry.getValue() <= 0) {
+                continue;
+            }
+            chart.addSeries(labelFn.apply(entry.getKey()), entry.getValue());
+            any = true;
+        }
+        if (!any) {
+            return null;
+        }
+        return upload(BitmapEncoder.getBufferedImage(chart), "composition");
+    }
+
+    public static RenderedChart topItemsChart(List<ChartData.ItemEntry> items, int width, int height) {
+        if (items.isEmpty()) {
+            return null;
+        }
+        CategoryChart chart = new CategoryChartBuilder().width(width).height(height).build();
+        styleBase(chart.getStyler());
+        chart.getStyler().setLegendVisible(false);
+        chart.getStyler().setXAxisLabelRotation(30);
+        chart.getStyler().setHasAnnotations(false);
+
+        List<String> labels = new ArrayList<>();
+        List<Double> values = new ArrayList<>();
+        for (ChartData.ItemEntry item : items) {
+            labels.add(item.itemId().replace("minecraft:", ""));
+            values.add(item.value());
+        }
+        chart.addSeries("$", labels, values).setFillColor(ACCENT);
+
+        return upload(BitmapEncoder.getBufferedImage(chart), "items");
+    }
+
+    private static void styleBase(org.knowm.xchart.style.AxesChartStyler styler) {
+        styler.setChartBackgroundColor(BG);
+        styler.setPlotBackgroundColor(PLOT_BG);
+        styler.setPlotGridLinesColor(GRID);
+        styler.setChartFontColor(FONT);
+        styler.setAxisTickLabelsColor(FONT);
+        styler.setPlotBorderVisible(false);
+        styler.setLegendBackgroundColor(BG);
+    }
+
+    private static RenderedChart upload(BufferedImage image, String key) {
+        int w = image.getWidth();
+        int h = image.getHeight();
+        NativeImage nativeImage = new NativeImage(w, h, false);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nativeImage.setColorArgb(x, y, image.getRGB(x, y));
+            }
+        }
+        NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "minecraftwealth_" + key, nativeImage);
+        String uniqueKey = "minecraftwealth_" + key + "_" + COUNTER.incrementAndGet();
+        Identifier id = MinecraftClient.getInstance().getTextureManager().registerDynamicTexture(uniqueKey, texture);
+        return new RenderedChart(id, texture, w, h);
+    }
+}

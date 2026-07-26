@@ -1,0 +1,77 @@
+plugins {
+	id 'fabric-loom' version '1.9-SNAPSHOT'
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	maven { url = 'https://maven.fabricmc.net/' }
+	mavenCentral()
+	maven { url = 'https://maven.shedaniel.me/' }
+	maven { url = 'https://maven.terraformersmc.com/' }
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"minecraft-wealth" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+fabricApi {
+	configureDataGeneration()
+}
+
+dependencies {
+	// Minecraft toolchain
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API (модульный, тянем bom -- используем только нужные модули через runtime resolution)
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Cloth Config -- GUI для конфигурации цен/лидерборда без релоада мира
+	modImplementation "me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}"
+
+	// Mod Menu -- показывает конфиг-экран мода в списке модов
+	modImplementation "com.terraformersmc:modmenu:${project.mod_menu_version}"
+
+	clientImplementation "org.knowm.xchart:xchart:${project.xchart_version}"
+	include "org.knowm.xchart:xchart:${project.xchart_version}"
+	include "de.erichseifert.vectorgraphics2d:VectorGraphics2D:0.13"
+}
+
+processResources {
+	inputs.property "version", project.version
+	filesMatching("fabric.mod.json") {
+		expand "version": project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+	it.options.encoding = "UTF-8"
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	from("LICENSE") {
+		rename { "${it}_${project.base.archivesName.get()}" }
+	}
+}
