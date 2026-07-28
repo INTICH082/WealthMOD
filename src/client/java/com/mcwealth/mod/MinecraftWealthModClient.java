@@ -3,6 +3,7 @@ package com.mcwealth.mod;
 import com.mcwealth.mod.hud.WealthHud;
 import com.mcwealth.mod.hud.WealthHudState;
 import com.mcwealth.mod.network.ModNetworkingClient;
+import com.mcwealth.mod.price.PriceTooltip;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -18,6 +19,7 @@ public final class MinecraftWealthModClient implements ClientModInitializer {
     public void onInitializeClient() {
         ModNetworkingClient.register();
         WealthHud.register();
+        PriceTooltip.register();
 
         toggleHudKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.minecraftwealth.toggle_hud",

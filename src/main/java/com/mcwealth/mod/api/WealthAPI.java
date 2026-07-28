@@ -1,6 +1,7 @@
 package com.mcwealth.mod.api;
 
 import com.mcwealth.mod.MinecraftWealthMod;
+import com.mcwealth.mod.advancement.ModAdvancements;
 import com.mcwealth.mod.economy.WealthResult;
 import com.mcwealth.mod.storage.LeaderboardEntry;
 import net.minecraft.item.Item;
@@ -17,8 +18,9 @@ public final class WealthAPI {
     }
 
     public static WealthResult getWealth(ServerPlayerEntity player) {
-        WealthResult result = MinecraftWealthMod.getInstance().wealthCalculator().calculate(player);
+        WealthResult result = MinecraftWealthMod.getInstance().wealthCache().getOrCompute(player);
         MinecraftWealthMod.getInstance().leaderboard().update(result.playerId(), result.playerName(), result.total());
+        ModAdvancements.WEALTH_MILESTONE.trigger(player, result.total());
         WealthChangeCallback.EVENT.invoker().onWealthComputed(player, result);
         return result;
     }
@@ -42,5 +44,29 @@ public final class WealthAPI {
 
     public static List<LeaderboardEntry> getLeaderboard(int count) {
         return MinecraftWealthMod.getInstance().leaderboard().top(count);
+    }
+
+    public static double getBankBalance(UUID playerId) {
+        return MinecraftWealthMod.getInstance().economy().getBalance(playerId);
+    }
+
+    public static boolean hasBankBalance(UUID playerId, double amount) {
+        return MinecraftWealthMod.getInstance().economy().has(playerId, amount);
+    }
+
+    public static void setBankBalance(UUID playerId, double amount) {
+        MinecraftWealthMod.getInstance().economy().setBalance(playerId, amount);
+    }
+
+    public static double depositToBank(UUID playerId, double amount) {
+        return MinecraftWealthMod.getInstance().economy().deposit(playerId, amount);
+    }
+
+    public static boolean withdrawFromBank(UUID playerId, double amount) {
+        return MinecraftWealthMod.getInstance().economy().withdraw(playerId, amount);
+    }
+
+    public static boolean transferBankBalance(UUID fromPlayer, UUID toPlayer, double amount) {
+        return MinecraftWealthMod.getInstance().economy().transfer(fromPlayer, toPlayer, amount);
     }
 }

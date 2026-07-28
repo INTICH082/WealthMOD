@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.mcwealth.mod.gui.ForbesScreen;
 import com.mcwealth.mod.gui.WealthChartsScreen;
 import com.mcwealth.mod.hud.WealthHudState;
+import com.mcwealth.mod.price.ClientPriceCache;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 public final class ModNetworkingClient {
@@ -26,5 +27,10 @@ public final class ModNetworkingClient {
 
         ClientPlayNetworking.registerGlobalReceiver(WealthHudPayload.ID, (payload, context) ->
                 context.client().execute(() -> WealthHudState.update(payload.total())));
+
+        ClientPlayNetworking.registerGlobalReceiver(PriceTablePayload.ID, (payload, context) -> {
+            PriceTableData data = GSON.fromJson(payload.json(), PriceTableData.class);
+            context.client().execute(() -> ClientPriceCache.update(data.prices(), data.defaultPrice()));
+        });
     }
 }

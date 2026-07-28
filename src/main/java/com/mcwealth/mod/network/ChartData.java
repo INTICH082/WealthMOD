@@ -8,6 +8,6 @@ public record ChartData(String playerName, double total, Map<String, Double> byC
     public record ItemEntry(String itemId, double value) {
     }
 
-    public record HistoryEntry(long timestampMillis, double total) {
+    public record HistoryEntry(long timestampMillis, double total, int rank) {
     }
 }

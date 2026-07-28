@@ -1,5 +1,7 @@
 package com.mcwealth.mod.schedule;
 
+import com.mcwealth.mod.advancement.ModAdvancements;
+import com.mcwealth.mod.economy.WealthCache;
 import com.mcwealth.mod.economy.WealthCalculator;
 import com.mcwealth.mod.economy.WealthResult;
 import com.mcwealth.mod.network.WealthHudPayload;
@@ -24,14 +26,17 @@ public final class AutoUpdateService {
     private final WealthCalculator calculator;
     private final LeaderboardService leaderboard;
     private final WealthHistoryService history;
+    private final WealthCache cache;
     private final Map<UUID, WealthResult> lastResults = new ConcurrentHashMap<>();
     private final Deque<ServerPlayerEntity> queue = new ArrayDeque<>();
     private long tickCounter = 0;
 
-    public AutoUpdateService(WealthCalculator calculator, LeaderboardService leaderboard, WealthHistoryService history) {
+    public AutoUpdateService(WealthCalculator calculator, LeaderboardService leaderboard,
+                              WealthHistoryService history, WealthCache cache) {
         this.calculator = calculator;
         this.leaderboard = leaderboard;
         this.history = history;
+        this.cache = cache;
     }
 
     public void tick(MinecraftServer server) {
@@ -47,8 +52,10 @@ public final class AutoUpdateService {
                 continue;
             }
             WealthResult result = calculator.calculate(player);
+            cache.put(result);
             leaderboard.update(result.playerId(), result.playerName(), result.total());
             lastResults.put(result.playerId(), result);
+            ModAdvancements.WEALTH_MILESTONE.trigger(player, result.total());
 
             if (ServerPlayNetworking.canSend(player, WealthHudPayload.ID)) {
                 ServerPlayNetworking.send(player, new WealthHudPayload(result.total()));
@@ -57,7 +64,8 @@ public final class AutoUpdateService {
 
         if (tickCounter % HISTORY_INTERVAL_TICKS == 0) {
             for (WealthResult result : lastResults.values()) {
-                history.record(result);
+                int rank = leaderboard.rankOf(result.playerId());
+                history.record(result, rank);
             }
         }
     }

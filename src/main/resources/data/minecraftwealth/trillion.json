@@ -1,0 +1,30 @@
+{
+  "parent": "minecraftwealth:wealth/hundred_billion",
+  "display": {
+    "icon": {
+      "id": "minecraft:dragon_egg"
+    },
+    "title": {
+      "translate": "advancement.minecraftwealth.trillion.title"
+    },
+    "description": {
+      "translate": "advancement.minecraftwealth.trillion.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "reached": {
+      "trigger": "minecraftwealth:wealth_milestone",
+      "conditions": {
+        "amount": 1000000000000.0
+      }
+    }
+  },
+  "requirements": [
+    [
+      "reached"
+    ]
+  ]
+}

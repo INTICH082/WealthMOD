@@ -52,21 +52,42 @@ public final class ChartTextureFactory {
         }
         XYChart chart = new XYChartBuilder().width(width).height(height).build();
         styleBase(chart.getStyler());
+        chart.getStyler().setLegendVisible(true);
+        chart.getStyler().setLegendBackgroundColor(BG);
 
         double[] xData = new double[history.size()];
-        double[] yData = new double[history.size()];
+        double[] wealthData = new double[history.size()];
+        double[] rankData = new double[history.size()];
+        boolean hasRank = false;
         for (int i = 0; i < history.size(); i++) {
             xData[i] = i;
-            yData[i] = history.get(i).total();
+            wealthData[i] = history.get(i).total();
+            int rank = history.get(i).rank();
+            rankData[i] = rank > 0 ? rank : Double.NaN;
+            hasRank |= rank > 0;
         }
-        XYSeries series = chart.addSeries("$", xData, yData);
-        series.setMarker(SeriesMarkers.CIRCLE);
-        series.setMarkerColor(ACCENT);
-        series.setLineColor(ACCENT);
-        series.setLineWidth(2f);
-        series.setXYSeriesRenderStyle(org.knowm.xchart.XYSeries.XYSeriesRenderStyle.Area);
-        series.setFillColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
-        chart.getStyler().setLegendVisible(false);
+
+        XYSeries wealthSeries = chart.addSeries("$", xData, wealthData);
+        wealthSeries.setMarker(SeriesMarkers.CIRCLE);
+        wealthSeries.setMarkerColor(ACCENT);
+        wealthSeries.setLineColor(ACCENT);
+        wealthSeries.setLineWidth(2f);
+        wealthSeries.setXYSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Area);
+        wealthSeries.setFillColor(new Color(ACCENT.getRed(), ACCENT.getGreen(), ACCENT.getBlue(), 60));
+        wealthSeries.setYAxisGroup(0);
+
+        if (hasRank) {
+            Color rankColor = new Color(255, 170, 50);
+            chart.setYAxisGroupTitle(1, "#");
+            chart.getStyler().setYAxisGroupPosition(1, org.knowm.xchart.style.Styler.YAxisPosition.Right);
+            XYSeries rankSeries = chart.addSeries("Rank", xData, rankData);
+            rankSeries.setMarker(SeriesMarkers.DIAMOND);
+            rankSeries.setMarkerColor(rankColor);
+            rankSeries.setLineColor(rankColor);
+            rankSeries.setYAxisGroup(1);
+        } else {
+            chart.getStyler().setLegendVisible(false);
+        }
 
         return upload(BitmapEncoder.getBufferedImage(chart), "history");
     }

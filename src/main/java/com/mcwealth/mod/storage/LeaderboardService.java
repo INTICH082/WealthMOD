@@ -77,6 +77,15 @@ public final class LeaderboardService {
                 .collect(Collectors.toList());
     }
 
+    public int rankOf(UUID playerId) {
+        List<UUID> ordered = entries.values().stream()
+                .sorted(Comparator.comparingDouble(LeaderboardEntry::wealth).reversed())
+                .map(LeaderboardEntry::playerId)
+                .collect(Collectors.toList());
+        int index = ordered.indexOf(playerId);
+        return index < 0 ? -1 : index + 1;
+    }
+
     public int size() {
         return entries.size();
     }

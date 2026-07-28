@@ -4,8 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.mcwealth.mod.MinecraftWealthMod;
-import com.mcwealth.mod.economy.WealthCategory;
-import com.mcwealth.mod.economy.WealthResult;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -15,8 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,24 +21,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class WealthHistoryService {
+public final class EconomyService {
 
-    private static final int MAX_POINTS_PER_PLAYER = 200;
-    private static final Gson GSON = new GsonBuilder().create();
-    private static final Type MAP_TYPE = new TypeToken<Map<UUID, List<HistoryPoint>>>() {}.getType();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Type MAP_TYPE = new TypeToken<Map<UUID, Double>>() {}.getType();
 
     private final Path file;
-    private final Map<UUID, List<HistoryPoint>> history = new ConcurrentHashMap<>();
+    private final Map<UUID, Double> balances = new ConcurrentHashMap<>();
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "minecraftwealth-history-io");
+        Thread t = new Thread(r, "minecraftwealth-economy-io");
         t.setDaemon(true);
         return t;
     });
     private final AtomicBoolean dirty = new AtomicBoolean(false);
     private final AtomicBoolean saveScheduled = new AtomicBoolean(false);
 
-    public WealthHistoryService(Path configDir) {
-        this.file = configDir.resolve("history.json");
+    public EconomyService(Path configDir) {
+        this.file = configDir.resolve("economy.json");
     }
 
     public void load() {
@@ -50,42 +45,76 @@ public final class WealthHistoryService {
             return;
         }
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            Map<UUID, List<HistoryPoint>> loaded = GSON.fromJson(reader, MAP_TYPE);
+            Map<UUID, Double> loaded = GSON.fromJson(reader, MAP_TYPE);
             if (loaded != null) {
-                history.putAll(loaded);
+                balances.putAll(loaded);
             }
         } catch (IOException e) {
-            MinecraftWealthMod.LOGGER.error("Failed to load history.json", e);
+            MinecraftWealthMod.LOGGER.error("Failed to load economy.json", e);
         }
     }
 
-    public synchronized void record(WealthResult result, int rank) {
-        List<HistoryPoint> points = history.computeIfAbsent(result.playerId(), id -> new ArrayList<>());
-        Map<WealthCategory, Double> byCategory = result.byCategory();
-        points.add(new HistoryPoint(
-                System.currentTimeMillis(),
-                result.total(),
-                byCategory.getOrDefault(WealthCategory.INVENTORY, 0.0D),
-                byCategory.getOrDefault(WealthCategory.ENDER_CHEST, 0.0D),
-                byCategory.getOrDefault(WealthCategory.EQUIPMENT, 0.0D),
-                byCategory.getOrDefault(WealthCategory.HAND, 0.0D),
-                rank));
-        while (points.size() > MAX_POINTS_PER_PLAYER) {
-            points.remove(0);
+    public double getBalance(UUID playerId) {
+        return balances.getOrDefault(playerId, 0.0D);
+    }
+
+    public boolean has(UUID playerId, double amount) {
+        return getBalance(playerId) >= amount;
+    }
+
+    public void setBalance(UUID playerId, double amount) {
+        balances.put(playerId, Math.max(0.0D, amount));
+        markDirty();
+    }
+
+    public double deposit(UUID playerId, double amount) {
+        double newBalance = balances.merge(playerId, Math.max(0.0D, amount), Double::sum);
+        markDirty();
+        return newBalance;
+    }
+
+    public boolean withdraw(UUID playerId, double amount) {
+        if (amount <= 0) {
+            return true;
         }
+        double[] result = new double[1];
+        boolean[] ok = new boolean[]{false};
+        balances.compute(playerId, (id, current) -> {
+            double balance = current == null ? 0.0D : current;
+            if (balance >= amount) {
+                ok[0] = true;
+                result[0] = balance - amount;
+                return result[0];
+            }
+            return current;
+        });
+        if (ok[0]) {
+            markDirty();
+        }
+        return ok[0];
+    }
+
+    public boolean transfer(UUID fromPlayer, UUID toPlayer, double amount) {
+        if (amount <= 0) {
+            return false;
+        }
+        if (!withdraw(fromPlayer, amount)) {
+            return false;
+        }
+        deposit(toPlayer, amount);
+        return true;
+    }
+
+    private void markDirty() {
         dirty.set(true);
         scheduleSave();
-    }
-
-    public List<HistoryPoint> get(UUID playerId) {
-        return history.getOrDefault(playerId, List.of());
     }
 
     private void scheduleSave() {
         if (saveScheduled.compareAndSet(false, true)) {
             ioExecutor.execute(() -> {
                 try {
-                    TimeUnit.SECONDS.sleep(5);
+                    TimeUnit.SECONDS.sleep(2);
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
                 } finally {
@@ -103,11 +132,11 @@ public final class WealthHistoryService {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
             try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
-                GSON.toJson(history, MAP_TYPE, writer);
+                GSON.toJson(balances, MAP_TYPE, writer);
             }
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            MinecraftWealthMod.LOGGER.error("Failed to save history.json", e);
+            MinecraftWealthMod.LOGGER.error("Failed to save economy.json", e);
         }
     }
 

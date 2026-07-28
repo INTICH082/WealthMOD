@@ -1,0 +1,30 @@
+{
+  "parent": "minecraftwealth:wealth/ten_million",
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_block"
+    },
+    "title": {
+      "translate": "advancement.minecraftwealth.hundred_million.title"
+    },
+    "description": {
+      "translate": "advancement.minecraftwealth.hundred_million.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "reached": {
+      "trigger": "minecraftwealth:wealth_milestone",
+      "conditions": {
+        "amount": 100000000.0
+      }
+    }
+  },
+  "requirements": [
+    [
+      "reached"
+    ]
+  ]
+}

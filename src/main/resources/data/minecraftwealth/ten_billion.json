@@ -1,0 +1,30 @@
+{
+  "parent": "minecraftwealth:wealth/billion",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_block"
+    },
+    "title": {
+      "translate": "advancement.minecraftwealth.ten_billion.title"
+    },
+    "description": {
+      "translate": "advancement.minecraftwealth.ten_billion.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "reached": {
+      "trigger": "minecraftwealth:wealth_milestone",
+      "conditions": {
+        "amount": 10000000000.0
+      }
+    }
+  },
+  "requirements": [
+    [
+      "reached"
+    ]
+  ]
+}

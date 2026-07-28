@@ -1,5 +1,6 @@
 package com.mcwealth.mod.economy;
 
+import com.mcwealth.mod.storage.EconomyService;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
@@ -10,9 +11,11 @@ public final class WealthCalculator {
 
     private final PriceRegistry prices;
     private final ContainerScanner containerScanner;
+    private final EconomyService economy;
 
-    public WealthCalculator(PriceRegistry prices) {
+    public WealthCalculator(PriceRegistry prices, EconomyService economy) {
         this.prices = prices;
+        this.economy = economy;
         this.containerScanner = new ContainerScanner(prices);
     }
 
@@ -39,6 +42,8 @@ public final class WealthCalculator {
         for (int slot = 0; slot < enderChest.size(); slot++) {
             builder.add(WealthCategory.ENDER_CHEST, containerScanner.valueStack(enderChest.getStack(slot), leafSink));
         }
+
+        builder.add(WealthCategory.BANK, economy.getBalance(player.getUuid()));
 
         return builder.build();
     }
