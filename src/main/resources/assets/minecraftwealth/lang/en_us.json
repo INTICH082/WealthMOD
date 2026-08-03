@@ -48,5 +48,14 @@
   "command.minecraftwealth.economy.give": "Gave %s to %s (new balance: %s).",
   "command.minecraftwealth.economy.take": "Took %s from %s.",
   "command.minecraftwealth.economy.set": "Set %s's bank balance to %s.",
-  "command.minecraftwealth.economy.insufficient": "%s does not have enough bank balance for that."
+  "command.minecraftwealth.economy.insufficient": "%s does not have enough bank balance for that.",
+  "command.minecraftwealth.ratelimited": "Please wait a moment before using this command again.",
+  "command.minecraftwealth.compare.players_only": "Only players can compare wealth.",
+  "command.minecraftwealth.compare.self": "Pick someone else to compare with.",
+  "command.minecraftwealth.compare.not_found": "No known wealth data for '%s' (they must have run /wealth at least once).",
+  "text.minecraftwealth.compare.richer": "You are richer by $%s",
+  "text.minecraftwealth.compare.poorer": "You are poorer by $%s",
+  "text.minecraftwealth.compare.equal": "You're exactly even",
+  "text.minecraftwealth.compare.offline": "(offline, last known)",
+  "text.minecraftwealth.compare.no_breakdown": "No category breakdown available (player is offline)"
 }

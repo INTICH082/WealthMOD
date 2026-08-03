@@ -138,6 +138,38 @@ public final class ChartTextureFactory {
         return upload(BitmapEncoder.getBufferedImage(chart), "items");
     }
 
+    public static RenderedChart compareChart(String selfName, Map<String, Double> selfByCategory,
+                                              String otherName, Map<String, Double> otherByCategory,
+                                              Function<String, String> labelFn, int width, int height) {
+        CategoryChart chart = new CategoryChartBuilder().width(width).height(height).build();
+        styleBase(chart.getStyler());
+        chart.getStyler().setLegendVisible(true);
+        chart.getStyler().setXAxisLabelRotation(20);
+        chart.getStyler().setHasAnnotations(false);
+
+        List<String> labels = new ArrayList<>();
+        List<Double> selfValues = new ArrayList<>();
+        List<Double> otherValues = new ArrayList<>();
+        for (String key : selfByCategory.keySet()) {
+            double a = selfByCategory.getOrDefault(key, 0.0D);
+            double b = otherByCategory.getOrDefault(key, 0.0D);
+            if (a <= 0 && b <= 0) {
+                continue;
+            }
+            labels.add(labelFn.apply(key));
+            selfValues.add(a);
+            otherValues.add(b);
+        }
+        if (labels.isEmpty()) {
+            return null;
+        }
+
+        chart.addSeries(selfName, labels, selfValues).setFillColor(ACCENT);
+        chart.addSeries(otherName, labels, otherValues).setFillColor(new Color(220, 90, 90));
+
+        return upload(BitmapEncoder.getBufferedImage(chart), "compare");
+    }
+
     private static void styleBase(org.knowm.xchart.style.AxesChartStyler styler) {
         styler.setChartBackgroundColor(BG);
         styler.setPlotBackgroundColor(PLOT_BG);

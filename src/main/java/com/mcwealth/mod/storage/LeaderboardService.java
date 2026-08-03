@@ -70,6 +70,13 @@ public final class LeaderboardService {
         return entries.get(playerId);
     }
 
+    public LeaderboardEntry findByName(String playerName) {
+        return entries.values().stream()
+                .filter(entry -> entry.playerName().equalsIgnoreCase(playerName))
+                .findFirst()
+                .orElse(null);
+    }
+
     public List<LeaderboardEntry> top(int count) {
         return entries.values().stream()
                 .sorted(Comparator.comparingDouble(LeaderboardEntry::wealth).reversed())

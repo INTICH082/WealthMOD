@@ -6,6 +6,7 @@ import com.mcwealth.mod.config.ConfigManager;
 import com.mcwealth.mod.economy.PriceRegistry;
 import com.mcwealth.mod.economy.WealthCache;
 import com.mcwealth.mod.economy.WealthCalculator;
+import com.mcwealth.mod.network.ComparePayload;
 import com.mcwealth.mod.network.ForbesPayload;
 import com.mcwealth.mod.network.PriceTableData;
 import com.mcwealth.mod.network.PriceTablePayload;
@@ -63,6 +64,7 @@ public final class MinecraftWealthMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(ForbesPayload.ID, ForbesPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(WealthHudPayload.ID, WealthHudPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(PriceTablePayload.ID, PriceTablePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ComparePayload.ID, ComparePayload.CODEC);
 
         ModCommands.register();
 
@@ -87,6 +89,9 @@ public final class MinecraftWealthMod implements ModInitializer {
             if (ServerPlayNetworking.canSend(handler.getPlayer(), PriceTablePayload.ID)) {
                 ServerPlayNetworking.send(handler.getPlayer(), new PriceTablePayload(buildPriceTableJson()));
             }
+        });
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            autoUpdateService.forget(handler.getPlayer().getUuid());
         });
 
         LOGGER.info("Minecraft Wealth initialized with {} priced items", priceRegistry.size());

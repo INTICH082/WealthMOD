@@ -48,5 +48,14 @@
   "command.minecraftwealth.economy.give": "Начислено %s игроку %s (новый баланс: %s).",
   "command.minecraftwealth.economy.take": "Списано %s у игрока %s.",
   "command.minecraftwealth.economy.set": "Баланс игрока %s установлен в %s.",
-  "command.minecraftwealth.economy.insufficient": "У игрока %s недостаточно средств на балансе."
+  "command.minecraftwealth.economy.insufficient": "У игрока %s недостаточно средств на балансе.",
+  "command.minecraftwealth.ratelimited": "Подождите немного перед повторным использованием этой команды.",
+  "command.minecraftwealth.compare.players_only": "Сравнивать состояние могут только игроки.",
+  "command.minecraftwealth.compare.self": "Выберите другого игрока для сравнения.",
+  "command.minecraftwealth.compare.not_found": "Нет данных о состоянии игрока '%s' (он должен хотя бы раз выполнить /wealth).",
+  "text.minecraftwealth.compare.richer": "Вы богаче на $%s",
+  "text.minecraftwealth.compare.poorer": "Вы беднее на $%s",
+  "text.minecraftwealth.compare.equal": "У вас поровну",
+  "text.minecraftwealth.compare.offline": "(не в сети, последнее известное)",
+  "text.minecraftwealth.compare.no_breakdown": "Разбивка по категориям недоступна (игрок не в сети)"
 }

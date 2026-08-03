@@ -1,6 +1,7 @@
 package com.mcwealth.mod.network;
 
 import com.google.gson.Gson;
+import com.mcwealth.mod.gui.CompareScreen;
 import com.mcwealth.mod.gui.ForbesScreen;
 import com.mcwealth.mod.gui.WealthChartsScreen;
 import com.mcwealth.mod.hud.WealthHudState;
@@ -31,6 +32,11 @@ public final class ModNetworkingClient {
         ClientPlayNetworking.registerGlobalReceiver(PriceTablePayload.ID, (payload, context) -> {
             PriceTableData data = GSON.fromJson(payload.json(), PriceTableData.class);
             context.client().execute(() -> ClientPriceCache.update(data.prices(), data.defaultPrice()));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ComparePayload.ID, (payload, context) -> {
+            CompareData data = GSON.fromJson(payload.json(), CompareData.class);
+            context.client().execute(() -> context.client().setScreen(new CompareScreen(data)));
         });
     }
 }

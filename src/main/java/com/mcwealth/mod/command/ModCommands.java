@@ -6,6 +6,8 @@ import com.mcwealth.mod.advancement.ModAdvancements;
 import com.mcwealth.mod.economy.WealthCategory;
 import com.mcwealth.mod.economy.WealthResult;
 import com.mcwealth.mod.network.ChartData;
+import com.mcwealth.mod.network.CompareData;
+import com.mcwealth.mod.network.ComparePayload;
 import com.mcwealth.mod.network.ForbesData;
 import com.mcwealth.mod.network.ForbesPayload;
 import com.mcwealth.mod.network.WealthChartsPayload;
@@ -15,8 +17,10 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.command.CommandSource;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -34,7 +38,11 @@ import java.util.stream.Collectors;
 public final class ModCommands {
 
     private static final int DEFAULT_FORBES_SIZE = 50;
+    private static final long GRAPH_COOLDOWN_MS = 2000;
+    private static final long FORBES_COOLDOWN_MS = 2000;
+    private static final long COMPARE_COOLDOWN_MS = 2000;
     private static final Gson GSON = new Gson();
+    private static final RateLimiter RATE_LIMITER = new RateLimiter();
 
     private ModCommands() {
     }
@@ -55,6 +63,10 @@ public final class ModCommands {
                         .executes(ctx -> sendCharts(ctx.getSource(), ctx.getSource().getPlayerOrThrow()))
                         .then(CommandManager.argument("player", EntityArgumentType.player())
                                 .executes(ctx -> sendCharts(ctx.getSource(), EntityArgumentType.getPlayer(ctx, "player")))))
+                .then(CommandManager.literal("compare")
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                                .suggests(ModCommands::suggestPlayerNames)
+                                .executes(ModCommands::compare)))
                 .then(CommandManager.literal("pay")
                         .then(CommandManager.argument("player", StringArgumentType.word())
                                 .then(CommandManager.argument("amount", DoubleArgumentType.doubleArg(0.01))
@@ -84,6 +96,16 @@ public final class ModCommands {
                 .executes(ctx -> showLeaderboard(ctx.getSource(), DEFAULT_FORBES_SIZE))
                 .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 100))
                         .executes(ctx -> showLeaderboard(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "count")))));
+    }
+
+    private static java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestPlayerNames(
+            CommandContext<ServerCommandSource> ctx, com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
+        List<String> names = new ArrayList<>();
+        ctx.getSource().getServer().getPlayerManager().getPlayerList()
+                .forEach(p -> names.add(p.getGameProfile().getName()));
+        MinecraftWealthMod.getInstance().leaderboard().top(100)
+                .forEach(e -> names.add(e.playerName()));
+        return CommandSource.suggestMatching(names, builder);
     }
 
     private static int showWealth(ServerCommandSource source, ServerPlayerEntity target) {
@@ -117,14 +139,20 @@ public final class ModCommands {
             return 0;
         }
 
-        if (source.getEntity() instanceof ServerPlayerEntity player && ServerPlayNetworking.canSend(player, ForbesPayload.ID)) {
-            List<ForbesData.Entry> entries = new ArrayList<>(top.size());
-            for (int i = 0; i < top.size(); i++) {
-                LeaderboardEntry entry = top.get(i);
-                entries.add(new ForbesData.Entry(i + 1, entry.playerName(), entry.wealth()));
+        if (source.getEntity() instanceof ServerPlayerEntity player) {
+            if (!RATE_LIMITER.tryAcquire(player.getUuid(), "forbes", FORBES_COOLDOWN_MS)) {
+                source.sendError(Text.translatable("command.minecraftwealth.ratelimited"));
+                return 0;
             }
-            ServerPlayNetworking.send(player, new ForbesPayload(GSON.toJson(new ForbesData(entries))));
-            return top.size();
+            if (ServerPlayNetworking.canSend(player, ForbesPayload.ID)) {
+                List<ForbesData.Entry> entries = new ArrayList<>(top.size());
+                for (int i = 0; i < top.size(); i++) {
+                    LeaderboardEntry entry = top.get(i);
+                    entries.add(new ForbesData.Entry(i + 1, entry.playerName(), entry.wealth()));
+                }
+                ServerPlayNetworking.send(player, new ForbesPayload(GSON.toJson(new ForbesData(entries))));
+                return top.size();
+            }
         }
 
         source.sendFeedback(() -> Text.translatable("command.minecraftwealth.forbes.header"), false);
@@ -137,7 +165,7 @@ public final class ModCommands {
         return top.size();
     }
 
-    private static int reload(com.mojang.brigadier.context.CommandContext<ServerCommandSource> ctx) {
+    private static int reload(CommandContext<ServerCommandSource> ctx) {
         ServerCommandSource source = ctx.getSource();
         try {
             int count = MinecraftWealthMod.getInstance().configManager().reload();
@@ -161,6 +189,10 @@ public final class ModCommands {
             source.sendError(Text.translatable("command.minecraftwealth.graph.players_only"));
             return 0;
         }
+        if (!RATE_LIMITER.tryAcquire(requester.getUuid(), "graph", GRAPH_COOLDOWN_MS)) {
+            source.sendError(Text.translatable("command.minecraftwealth.ratelimited"));
+            return 0;
+        }
 
         WealthResult result = MinecraftWealthMod.getInstance().wealthCache().getOrCompute(target);
         MinecraftWealthMod.getInstance().leaderboard().update(result.playerId(), result.playerName(), result.total());
@@ -168,10 +200,7 @@ public final class ModCommands {
         int rank = MinecraftWealthMod.getInstance().leaderboard().rankOf(target.getUuid());
         MinecraftWealthMod.getInstance().history().record(result, rank);
 
-        Map<String, Double> byCategory = new LinkedHashMap<>();
-        for (WealthCategory category : WealthCategory.values()) {
-            byCategory.put(category.name(), result.byCategory().getOrDefault(category, 0.0D));
-        }
+        Map<String, Double> byCategory = categoriesToMap(result);
 
         List<ChartData.ItemEntry> topItems = result.topItems().stream()
                 .map(item -> new ChartData.ItemEntry(item.itemId(), item.value()))
@@ -187,7 +216,57 @@ public final class ModCommands {
         return 1;
     }
 
-    private static int pay(com.mojang.brigadier.context.CommandContext<ServerCommandSource> ctx) {
+    private static int compare(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource source = ctx.getSource();
+        if (!(source.getEntity() instanceof ServerPlayerEntity self)) {
+            source.sendError(Text.translatable("command.minecraftwealth.compare.players_only"));
+            return 0;
+        }
+        if (!RATE_LIMITER.tryAcquire(self.getUuid(), "compare", COMPARE_COOLDOWN_MS)) {
+            source.sendError(Text.translatable("command.minecraftwealth.ratelimited"));
+            return 0;
+        }
+
+        String targetName = StringArgumentType.getString(ctx, "player");
+        if (targetName.equalsIgnoreCase(self.getGameProfile().getName())) {
+            source.sendError(Text.translatable("command.minecraftwealth.compare.self"));
+            return 0;
+        }
+
+        WealthResult selfResult = MinecraftWealthMod.getInstance().wealthCache().getOrCompute(self);
+        MinecraftWealthMod.getInstance().leaderboard().update(selfResult.playerId(), selfResult.playerName(), selfResult.total());
+        Map<String, Double> selfByCategory = categoriesToMap(selfResult);
+
+        ServerPlayerEntity onlineTarget = source.getServer().getPlayerManager().getPlayer(targetName);
+        if (onlineTarget != null) {
+            WealthResult targetResult = MinecraftWealthMod.getInstance().wealthCache().getOrCompute(onlineTarget);
+            MinecraftWealthMod.getInstance().leaderboard().update(targetResult.playerId(), targetResult.playerName(), targetResult.total());
+            CompareData data = new CompareData(selfResult.playerName(), selfResult.total(), selfByCategory,
+                    targetResult.playerName(), targetResult.total(), categoriesToMap(targetResult), true);
+            ServerPlayNetworking.send(self, new ComparePayload(GSON.toJson(data)));
+            return 1;
+        }
+
+        LeaderboardEntry cached = MinecraftWealthMod.getInstance().leaderboard().findByName(targetName);
+        if (cached == null) {
+            source.sendError(Text.translatable("command.minecraftwealth.compare.not_found", targetName));
+            return 0;
+        }
+        CompareData data = new CompareData(selfResult.playerName(), selfResult.total(), selfByCategory,
+                cached.playerName(), cached.wealth(), Map.of(), false);
+        ServerPlayNetworking.send(self, new ComparePayload(GSON.toJson(data)));
+        return 1;
+    }
+
+    private static Map<String, Double> categoriesToMap(WealthResult result) {
+        Map<String, Double> map = new LinkedHashMap<>();
+        for (WealthCategory category : WealthCategory.values()) {
+            map.put(category.name(), result.byCategory().getOrDefault(category, 0.0D));
+        }
+        return map;
+    }
+
+    private static int pay(CommandContext<ServerCommandSource> ctx) {
         ServerCommandSource source = ctx.getSource();
         if (!(source.getEntity() instanceof ServerPlayerEntity sender)) {
             source.sendError(Text.translatable("command.minecraftwealth.pay.players_only"));
