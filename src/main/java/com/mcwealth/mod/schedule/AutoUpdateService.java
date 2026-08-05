@@ -12,7 +12,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +29,6 @@ public final class AutoUpdateService {
 
     private final Map<UUID, WealthResult> lastResults = new ConcurrentHashMap<>();
     private final Map<UUID, Long> fingerprints = new ConcurrentHashMap<>();
-    private final List<ServerPlayerEntity> checkOrder = new ArrayList<>();
     private int checkCursor = 0;
     private long tickCounter = 0;
 
@@ -61,8 +59,9 @@ public final class AutoUpdateService {
                 checked++;
 
                 long currentFingerprint = InventoryFingerprint.compute(player);
-                Long previous = fingerprints.put(player.getUuid(), currentFingerprint);
+                Long previous = fingerprints.get(player.getUuid());
                 if (previous == null || previous != currentFingerprint) {
+                    fingerprints.put(player.getUuid(), currentFingerprint);
                     recalculate(player);
                 }
 
@@ -80,9 +79,10 @@ public final class AutoUpdateService {
         }
     }
 
-    public void recalculate(ServerPlayerEntity player) {
+    public WealthResult recalculate(ServerPlayerEntity player) {
         WealthResult result = calculator.calculate(player);
         cache.put(result);
+        fingerprints.put(player.getUuid(), InventoryFingerprint.compute(player));
         leaderboard.update(result.playerId(), result.playerName(), result.total());
         lastResults.put(result.playerId(), result);
         ModAdvancements.WEALTH_MILESTONE.trigger(player, result.total());
@@ -90,6 +90,14 @@ public final class AutoUpdateService {
         if (ServerPlayNetworking.canSend(player, WealthHudPayload.ID)) {
             ServerPlayNetworking.send(player, new WealthHudPayload(result.total()));
         }
+        return result;
+    }
+
+    public WealthResult recalculateAndRecordHistory(ServerPlayerEntity player) {
+        WealthResult result = recalculate(player);
+        int rank = leaderboard.rankOf(player.getUuid());
+        history.record(result, rank);
+        return result;
     }
 
     public void forget(UUID playerId) {

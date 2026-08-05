@@ -16,12 +16,17 @@ import com.mcwealth.mod.schedule.AutoUpdateService;
 import com.mcwealth.mod.storage.EconomyService;
 import com.mcwealth.mod.storage.LeaderboardService;
 import com.mcwealth.mod.storage.WealthHistoryService;
+import com.mcwealth.mod.web.WebDashboardConfig;
+import com.mcwealth.mod.web.WebDashboardConfigLoader;
+import com.mcwealth.mod.web.WebDashboardServer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +48,7 @@ public final class MinecraftWealthMod implements ModInitializer {
     private WealthHistoryService history;
     private EconomyService economy;
     private AutoUpdateService autoUpdateService;
+    private WebDashboardServer webDashboard;
 
     @Override
     public void onInitialize() {
@@ -72,11 +78,25 @@ public final class MinecraftWealthMod implements ModInitializer {
             leaderboard.load();
             history.load();
             economy.load();
+
+            WebDashboardConfig webConfig = WebDashboardConfigLoader.load(configManager.configDir());
+            if (webConfig.enabled()) {
+                webDashboard = new WebDashboardServer(leaderboard);
+                try {
+                    webDashboard.start(webConfig.port());
+                } catch (java.io.IOException e) {
+                    LOGGER.error("Failed to start web dashboard on port {}", webConfig.port(), e);
+                    webDashboard = null;
+                }
+            }
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             leaderboard.shutdown();
             history.shutdown();
             economy.shutdown();
+            if (webDashboard != null) {
+                webDashboard.stop();
+            }
         });
         ServerTickEvents.END_SERVER_TICK.register(autoUpdateService::tick);
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
@@ -92,6 +112,11 @@ public final class MinecraftWealthMod implements ModInitializer {
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             autoUpdateService.forget(handler.getPlayer().getUuid());
+        });
+        ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
+            if (entity instanceof ServerPlayerEntity player) {
+                autoUpdateService.recalculateAndRecordHistory(player);
+            }
         });
 
         LOGGER.info("Minecraft Wealth initialized with {} priced items", priceRegistry.size());

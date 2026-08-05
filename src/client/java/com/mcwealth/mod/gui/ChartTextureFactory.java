@@ -117,27 +117,6 @@ public final class ChartTextureFactory {
         return upload(BitmapEncoder.getBufferedImage(chart), "composition");
     }
 
-    public static RenderedChart topItemsChart(List<ChartData.ItemEntry> items, int width, int height) {
-        if (items.isEmpty()) {
-            return null;
-        }
-        CategoryChart chart = new CategoryChartBuilder().width(width).height(height).build();
-        styleBase(chart.getStyler());
-        chart.getStyler().setLegendVisible(false);
-        chart.getStyler().setXAxisLabelRotation(30);
-        chart.getStyler().setHasAnnotations(false);
-
-        List<String> labels = new ArrayList<>();
-        List<Double> values = new ArrayList<>();
-        for (ChartData.ItemEntry item : items) {
-            labels.add(item.itemId().replace("minecraft:", ""));
-            values.add(item.value());
-        }
-        chart.addSeries("$", labels, values).setFillColor(ACCENT);
-
-        return upload(BitmapEncoder.getBufferedImage(chart), "items");
-    }
-
     public static RenderedChart compareChart(String selfName, Map<String, Double> selfByCategory,
                                               String otherName, Map<String, Double> otherByCategory,
                                               Function<String, String> labelFn, int width, int height) {
