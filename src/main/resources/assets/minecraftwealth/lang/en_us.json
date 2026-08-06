@@ -57,5 +57,7 @@
   "text.minecraftwealth.compare.poorer": "You are poorer by $%s",
   "text.minecraftwealth.compare.equal": "You're exactly even",
   "text.minecraftwealth.compare.offline": "(offline, last known)",
-  "text.minecraftwealth.compare.no_breakdown": "No category breakdown available (player is offline)"
+  "text.minecraftwealth.compare.no_breakdown": "No category breakdown available (player is offline)",
+  "command.minecraftwealth.discord.not_configured": "Discord webhook is not configured. Edit config/minecraftwealth/discord.json (set enabled: true and webhookUrl).",
+  "command.minecraftwealth.discord.test_sent": "Test message sent. Check your Discord channel; if nothing shows up, check the server console for errors."
 }

@@ -76,4 +76,41 @@ class LeaderboardServiceTest {
 
         assertEquals(777.0, second.get(player).wealth());
     }
+
+    @Test
+    void topChangeListenerFiresOnlyWhenTopPlayerActuallyChanges(@TempDir Path tempDir) {
+        LeaderboardService leaderboard = new LeaderboardService(tempDir);
+        List<String> newTopNames = new java.util.ArrayList<>();
+        leaderboard.setTopChangeListener((newTop, previousTop) -> newTopNames.add(newTop.playerName()));
+
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+
+        leaderboard.update(a, "Alice", 100.0);
+        assertEquals(List.of("Alice"), newTopNames);
+
+        leaderboard.update(b, "Bob", 50.0);
+        assertEquals(List.of("Alice"), newTopNames, "Bob didn't overtake Alice, no new event expected");
+
+        leaderboard.update(a, "Alice", 120.0);
+        assertEquals(List.of("Alice"), newTopNames, "Alice was already top, updating her own value isn't a new #1 event");
+
+        leaderboard.update(b, "Bob", 500.0);
+        assertEquals(List.of("Alice", "Bob"), newTopNames, "Bob overtaking Alice is a genuine new-top event");
+    }
+
+    @Test
+    void loadingExistingDataDoesNotFireTopChangeListener(@TempDir Path tempDir) {
+        UUID player = UUID.randomUUID();
+        LeaderboardService first = new LeaderboardService(tempDir);
+        first.update(player, "Alex", 777.0);
+        first.saveNow();
+
+        LeaderboardService second = new LeaderboardService(tempDir);
+        List<String> events = new java.util.ArrayList<>();
+        second.setTopChangeListener((newTop, previousTop) -> events.add(newTop.playerName()));
+        second.load();
+
+        assertTrue(events.isEmpty(), "load() must not fire the listener, only genuine post-startup changes should");
+    }
 }

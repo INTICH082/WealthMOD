@@ -3,6 +3,9 @@ package com.mcwealth.mod;
 import com.mcwealth.mod.advancement.ModAdvancements;
 import com.mcwealth.mod.command.ModCommands;
 import com.mcwealth.mod.config.ConfigManager;
+import com.mcwealth.mod.discord.DiscordWebhookConfig;
+import com.mcwealth.mod.discord.DiscordWebhookConfigLoader;
+import com.mcwealth.mod.discord.DiscordWebhookService;
 import com.mcwealth.mod.economy.PriceRegistry;
 import com.mcwealth.mod.economy.WealthCache;
 import com.mcwealth.mod.economy.WealthCalculator;
@@ -49,6 +52,7 @@ public final class MinecraftWealthMod implements ModInitializer {
     private EconomyService economy;
     private AutoUpdateService autoUpdateService;
     private WebDashboardServer webDashboard;
+    private DiscordWebhookService discordService;
 
     @Override
     public void onInitialize() {
@@ -75,6 +79,14 @@ public final class MinecraftWealthMod implements ModInitializer {
         ModCommands.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            DiscordWebhookConfig discordConfig = DiscordWebhookConfigLoader.load(configManager.configDir());
+            discordService = new DiscordWebhookService(discordConfig);
+            leaderboard.setTopChangeListener((newTop, previousTop) -> {
+                if (previousTop != null) {
+                    discordService.announceNewRichest(newTop.playerName(), newTop.wealth());
+                }
+            });
+
             leaderboard.load();
             history.load();
             economy.load();
@@ -156,6 +168,10 @@ public final class MinecraftWealthMod implements ModInitializer {
 
     public AutoUpdateService autoUpdateService() {
         return autoUpdateService;
+    }
+
+    public DiscordWebhookService discordService() {
+        return discordService;
     }
 
     public String buildPriceTableJson() {

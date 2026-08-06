@@ -90,7 +90,11 @@ public final class ModCommands {
                                         .then(CommandManager.argument("amount", DoubleArgumentType.doubleArg(0))
                                                 .executes(ctx -> economySet(ctx.getSource(),
                                                         EntityArgumentType.getPlayer(ctx, "player"),
-                                                        DoubleArgumentType.getDouble(ctx, "amount"))))))));
+                                                        DoubleArgumentType.getDouble(ctx, "amount")))))))
+                .then(CommandManager.literal("discord")
+                        .requires(source -> source.hasPermissionLevel(2))
+                        .then(CommandManager.literal("test")
+                                .executes(ModCommands::discordTest))));
 
         dispatcher.register(CommandManager.literal("forbes")
                 .executes(ctx -> showLeaderboard(ctx.getSource(), DEFAULT_FORBES_SIZE))
@@ -314,6 +318,17 @@ public final class ModCommands {
     private static int economySet(ServerCommandSource source, ServerPlayerEntity target, double amount) {
         MinecraftWealthMod.getInstance().economy().setBalance(target.getUuid(), amount);
         source.sendFeedback(() -> Text.translatable("command.minecraftwealth.economy.set", target.getGameProfile().getName(), format(amount)), true);
+        return 1;
+    }
+
+    private static int discordTest(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource source = ctx.getSource();
+        var discord = MinecraftWealthMod.getInstance().discordService();
+        if (discord == null || !discord.sendTestMessage()) {
+            source.sendError(Text.translatable("command.minecraftwealth.discord.not_configured"));
+            return 0;
+        }
+        source.sendFeedback(() -> Text.translatable("command.minecraftwealth.discord.test_sent"), false);
         return 1;
     }
 

@@ -57,5 +57,7 @@
   "text.minecraftwealth.compare.poorer": "Вы беднее на $%s",
   "text.minecraftwealth.compare.equal": "У вас поровну",
   "text.minecraftwealth.compare.offline": "(не в сети, последнее известное)",
-  "text.minecraftwealth.compare.no_breakdown": "Разбивка по категориям недоступна (игрок не в сети)"
+  "text.minecraftwealth.compare.no_breakdown": "Разбивка по категориям недоступна (игрок не в сети)",
+  "command.minecraftwealth.discord.not_configured": "Discord-вебхук не настроен. Отредактируйте config/minecraftwealth/discord.json (enabled: true и webhookUrl).",
+  "command.minecraftwealth.discord.test_sent": "Тестовое сообщение отправлено. Проверьте канал в Discord; если ничего не пришло — смотрите консоль сервера."
 }

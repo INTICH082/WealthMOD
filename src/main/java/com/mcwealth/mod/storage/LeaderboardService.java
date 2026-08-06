@@ -22,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 public final class LeaderboardService {
@@ -39,8 +40,16 @@ public final class LeaderboardService {
     private final AtomicBoolean dirty = new AtomicBoolean(false);
     private final AtomicBoolean saveScheduled = new AtomicBoolean(false);
 
+    private volatile LeaderboardEntry cachedTop = null;
+    private volatile BiConsumer<LeaderboardEntry, LeaderboardEntry> topChangeListener = null;
+
     public LeaderboardService(Path configDir) {
         this.file = configDir.resolve("leaderboard.json");
+    }
+
+    /** Called once, before any recalculation happens, so a pre-existing #1 doesn't fire a spurious "new richest" event on restart. */
+    public void setTopChangeListener(BiConsumer<LeaderboardEntry, LeaderboardEntry> listener) {
+        this.topChangeListener = listener;
     }
 
     public void load() {
@@ -54,16 +63,41 @@ public final class LeaderboardService {
                     entries.put(entry.playerId(), entry);
                 }
             }
+            cachedTop = computeTop();
             MinecraftWealthMod.LOGGER.info("Loaded {} leaderboard entries", entries.size());
         } catch (IOException e) {
             MinecraftWealthMod.LOGGER.error("Failed to load leaderboard.json", e);
         }
     }
 
-    public void update(UUID playerId, String playerName, double wealth) {
-        entries.put(playerId, new LeaderboardEntry(playerId, playerName, wealth, System.currentTimeMillis()));
+    public synchronized void update(UUID playerId, String playerName, double wealth) {
+        LeaderboardEntry newEntry = new LeaderboardEntry(playerId, playerName, wealth, System.currentTimeMillis());
+        entries.put(playerId, newEntry);
         dirty.set(true);
         scheduleSave();
+
+        boolean topMightHaveChanged = cachedTop == null
+                || wealth > cachedTop.wealth()
+                || cachedTop.playerId().equals(playerId);
+
+        if (topMightHaveChanged) {
+            LeaderboardEntry newTop = computeTop();
+            if (newTop != null && (cachedTop == null || !newTop.playerId().equals(cachedTop.playerId()))) {
+                LeaderboardEntry previousTop = cachedTop;
+                cachedTop = newTop;
+                if (topChangeListener != null) {
+                    topChangeListener.accept(newTop, previousTop);
+                }
+            } else {
+                cachedTop = newTop;
+            }
+        }
+    }
+
+    private LeaderboardEntry computeTop() {
+        return entries.values().stream()
+                .max(Comparator.comparingDouble(LeaderboardEntry::wealth))
+                .orElse(null);
     }
 
     public LeaderboardEntry get(UUID playerId) {
